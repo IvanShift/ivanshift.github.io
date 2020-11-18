@@ -1,7 +1,7 @@
 //import { DrawingCanvas } from './DrawingOnCanvas'; 
 class TDrawingCanvas {
     constructor() {
-        this.CELL_SIZE = 10;
+        this.CELL_SIZE = 20;
         this.GRID_LINE_COLOR = 'lightgray';
         this.pressEventHandler = (e) => {
             //WASD-control
@@ -34,9 +34,13 @@ class TDrawingCanvas {
         this.context = context;
         this.selectedDirection = Direction.Up;
         this.CreateUserEvents();
+        this.CanvasSizeInCells = { x: Math.floor(this.canvas.width / this.CELL_SIZE), y: Math.floor(this.canvas.height / this.CELL_SIZE) };
     }
     getDirection() {
         return this.selectedDirection;
+    }
+    getCanvasSizeInCells() {
+        return this.CanvasSizeInCells;
     }
     CreateUserEvents() {
         let canvas = this.canvas;
@@ -53,7 +57,6 @@ class TDrawingCanvas {
         this.context.stroke();
     }
     DrawGrid() {
-        //Draw Some Rect
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
         for (let i = 1; i < Math.floor(this.canvas.width / this.CELL_SIZE); i++) {
             this.DrawLine(i * this.CELL_SIZE, 0, i * this.CELL_SIZE, this.canvas.height, this.GRID_LINE_COLOR);
@@ -62,7 +65,7 @@ class TDrawingCanvas {
             this.DrawLine(0, i * this.CELL_SIZE, this.canvas.height, i * this.CELL_SIZE, this.GRID_LINE_COLOR);
         }
     }
-    DrawOneSegment(Point, Color) {
+    DrawOneCircle(Point, Color) {
         let Radius = Math.floor(this.CELL_SIZE / 2);
         let CentrX = Math.floor(Point.x * this.CELL_SIZE + this.CELL_SIZE / 2);
         let CentrY = Math.floor(Point.y * this.CELL_SIZE - this.CELL_SIZE / 2);
@@ -71,18 +74,17 @@ class TDrawingCanvas {
         this.context.lineWidth = 3;
         this.context.ellipse(CentrX, CentrY, Radius, Radius, 0, 0, 2 * Math.PI);
         this.context.stroke();
-        // console.log(CentrX + ' ' + CentrY + ' ' + Radius);
     }
     DrawSnake(Snake) {
         for (let i = 0; i < Snake.length; i++) {
             if (i == 0) 
             //Head
             {
-                this.DrawOneSegment(Snake[i], 'blue');
+                this.DrawOneCircle(Snake[i], 'blue');
             }
             //Tail
             else {
-                this.DrawOneSegment(Snake[i], 'green');
+                this.DrawOneCircle(Snake[i], 'green');
             }
         }
     }
@@ -103,11 +105,20 @@ class TSnake {
     //Snake growth Down, StartPoint - Head
     constructor(StartPoint, SnakeLength) {
         this.Tail = [];
+        this.PrevDirection = Direction.Up;
         this.Tail.push(StartPoint);
         for (let i = 1; i <= SnakeLength; i++) {
             let NextPoint = { x: StartPoint.x, y: StartPoint.y + i };
             this.Tail.push(NextPoint);
         }
+        this.HasFood = false;
+    }
+    Feed(FoodPos) {
+        this.FoodPosition = { x: FoodPos.x, y: FoodPos.y };
+        this.HasFood = true;
+    }
+    IsHungry() {
+        return !(this.HasFood);
     }
     MoveTo(direction) {
         let NextPoint = { x: this.Tail[0].x, y: this.Tail[0].y };
@@ -129,40 +140,84 @@ class TSnake {
                 break;
             }
         }
-        this.Tail.unshift(NextPoint);
-        this.Tail.pop();
+        // Food check
+        let IsOnFoodPosition = false;
+        if (this.HasFood) {
+            if ((NextPoint.x == this.FoodPosition.x) && (NextPoint.y == this.FoodPosition.y)) {
+                IsOnFoodPosition = true;
+                this.HasFood = false;
+            }
+        }
+        //Do not allow to move snake inside itself
+        if ((NextPoint.x != this.Tail[1].x) || (NextPoint.y != this.Tail[1].y)) {
+            this.Tail.unshift(NextPoint);
+            if (!(IsOnFoodPosition)) {
+                this.Tail.pop();
+            }
+            this.PrevDirection = direction;
+        }
+        else {
+            this.MoveTo(this.PrevDirection);
+        }
     }
     GetTail() {
         return this.Tail;
     }
 }
+class TSnakeFood {
+    constructor(AllSnake, MaxSize) {
+        this.MAX_ITER = 100;
+        this.setRndPosition(AllSnake, MaxSize);
+    }
+    getPosition() {
+        return this.Position;
+    }
+    getRandomInt(max) {
+        return Math.floor(Math.random() * Math.floor(max));
+    }
+    setRndPosition(AllSnake, MaxSize) {
+        let MaxIter = 0;
+        do {
+            this.Position = { x: this.getRandomInt(MaxSize.x), y: this.getRandomInt(MaxSize.y) };
+            var IsInside = AllSnake.includes(AllSnake.find(el => el.x == this.Position.x + 1, el => el.y == this.Position.y));
+            MaxIter++;
+        } while ((IsInside) || (MaxIter < this.MAX_ITER));
+    }
+}
 class TTimer {
     constructor(RunFunct) {
         this.Funct = RunFunct;
-        this.Timer = setInterval(null, 1000);
+        this.Timer = setInterval(null, 10000);
     }
     Start(milsec) {
+        this.Stop();
         this.Timer = setInterval(this.Funct, milsec);
     }
     Stop() {
         clearTimeout(this.Timer);
     }
 }
-function RunApp() {
+function RunGame() {
+    const GAME_SPEED = 400;
+    const BEGIN_POINT = { x: 20, y: 40 };
+    const SNAKE_LENGTH = 5;
     var el = document.getElementById("content");
     el.innerHTML = "Gamer: Tom, age: 29";
     let CurrentCanvas = new TDrawingCanvas();
-    CurrentCanvas.DrawGrid();
-    let BeginPoint = { x: 20, y: 40 };
-    let Snake = new TSnake(BeginPoint, 5);
-    CurrentCanvas.DrawSnake(Snake.GetTail());
-    Snake.MoveTo(Direction.Up);
-    let DrawSnake = () => CurrentCanvas.RedrawAll(Snake.GetTail());
-    let DrawTimer = new TTimer(DrawSnake);
-    DrawTimer.Start(300);
-    let MoveSnake = () => Snake.MoveTo(CurrentCanvas.getDirection());
+    let Snake = new TSnake(BEGIN_POINT, SNAKE_LENGTH);
+    let SnakeFood = new TSnakeFood(Snake.GetTail(), CurrentCanvas.getCanvasSizeInCells());
+    Snake.Feed(SnakeFood.getPosition());
+    let MoveSnake = () => {
+        if (Snake.IsHungry()) {
+            SnakeFood.setRndPosition(Snake.GetTail(), CurrentCanvas.getCanvasSizeInCells());
+            Snake.Feed(SnakeFood.getPosition());
+        }
+        Snake.MoveTo(CurrentCanvas.getDirection());
+        CurrentCanvas.RedrawAll(Snake.GetTail());
+        CurrentCanvas.DrawOneCircle(SnakeFood.getPosition(), 'orange');
+    };
     let MoveTimer = new TTimer(MoveSnake);
-    MoveTimer.Start(500);
+    MoveTimer.Start(GAME_SPEED);
 }
-RunApp();
+RunGame();
 //# sourceMappingURL=app.js.map
