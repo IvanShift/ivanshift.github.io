@@ -45,8 +45,31 @@ class TDrawingCanvas {
     CreateUserEvents() {
         let canvas = this.canvas;
         document.addEventListener("keydown", this.pressEventHandler);
-        //  document.getElementById('clear')
-        //     .addEventListener("click", this.clearEventHandler);
+        //    document.getElementById('restart').addEventListener("click", this.restartEventHandler);
+    }
+    //   private restartEventHandler = () => {       RunGame();   };
+    IsCollision(Snake) {
+        let isCollision = false;
+        //Border collision
+        if ((Snake[0].x) < 1 || (Snake[0].x > this.CanvasSizeInCells.x)) {
+            isCollision = true;
+        }
+        ;
+        if ((Snake[0].y) < 1 || (Snake[0].y > this.CanvasSizeInCells.y)) {
+            isCollision = true;
+        }
+        ;
+        //Self-collision
+        let Head = Snake[0];
+        for (let i = 1; i < Snake.length; i++) {
+            if ((Snake[0].x == Snake[i].x) && (Snake[0].y == Snake[i].y)) {
+                isCollision = true;
+                break;
+            }
+            ;
+        }
+        ;
+        return isCollision;
     }
     DrawLine(FromX, FromY, ToX, ToY, Color) {
         this.context.beginPath();
@@ -67,7 +90,7 @@ class TDrawingCanvas {
     }
     DrawOneCircle(Point, Color) {
         let Radius = Math.floor(this.CELL_SIZE / 2);
-        let CentrX = Math.floor(Point.x * this.CELL_SIZE + this.CELL_SIZE / 2);
+        let CentrX = Math.floor(Point.x * this.CELL_SIZE - this.CELL_SIZE / 2);
         let CentrY = Math.floor(Point.y * this.CELL_SIZE - this.CELL_SIZE / 2);
         this.context.beginPath();
         this.context.strokeStyle = Color;
@@ -148,7 +171,7 @@ class TSnake {
                 this.HasFood = false;
             }
         }
-        //Do not allow to move snake inside itself
+        //Do not allow to move snake back inside itself
         if ((NextPoint.x != this.Tail[1].x) || (NextPoint.y != this.Tail[1].y)) {
             this.Tail.unshift(NextPoint);
             if (!(IsOnFoodPosition)) {
@@ -178,8 +201,8 @@ class TSnakeFood {
     setRndPosition(AllSnake, MaxSize) {
         let MaxIter = 0;
         do {
-            this.Position = { x: this.getRandomInt(MaxSize.x), y: this.getRandomInt(MaxSize.y) };
-            var IsInside = AllSnake.includes(AllSnake.find(el => el.x == this.Position.x + 1, el => el.y == this.Position.y));
+            this.Position = { x: this.getRandomInt(MaxSize.x - 1) + 1, y: this.getRandomInt(MaxSize.y - 1) + 1 };
+            var IsInside = AllSnake.includes(AllSnake.find(el => el.x == this.Position.x, el => el.y == this.Position.y));
             MaxIter++;
         } while ((IsInside) || (MaxIter < this.MAX_ITER));
     }
@@ -201,20 +224,30 @@ function RunGame() {
     const GAME_SPEED = 200;
     const BEGIN_POINT = { x: 10, y: 20 };
     const SNAKE_LENGTH = 5;
+    const FOOD_COLOR = 'orange';
+    const COLLISION_COLOR = 'red';
     var el = document.getElementById("content");
-    el.innerHTML = "Gamer: Tom, age: 29";
+    el.innerHTML = 'Score: 0';
     let CurrentCanvas = new TDrawingCanvas();
     let Snake = new TSnake(BEGIN_POINT, SNAKE_LENGTH);
     let SnakeFood = new TSnakeFood(Snake.GetTail(), CurrentCanvas.getCanvasSizeInCells());
     Snake.Feed(SnakeFood.getPosition());
+    let Score = 0;
     let MoveSnake = () => {
         if (Snake.IsHungry()) {
             SnakeFood.setRndPosition(Snake.GetTail(), CurrentCanvas.getCanvasSizeInCells());
             Snake.Feed(SnakeFood.getPosition());
+            Score++;
+            el.innerHTML = 'Score: ' + Score;
         }
         Snake.MoveTo(CurrentCanvas.getDirection());
         CurrentCanvas.RedrawAll(Snake.GetTail());
-        CurrentCanvas.DrawOneCircle(SnakeFood.getPosition(), 'orange');
+        CurrentCanvas.DrawOneCircle(SnakeFood.getPosition(), FOOD_COLOR);
+        if (CurrentCanvas.IsCollision(Snake.GetTail())) {
+            MoveTimer.Stop();
+            CurrentCanvas.DrawOneCircle(Snake.GetTail()[0], COLLISION_COLOR);
+            CurrentCanvas.DrawOneCircle(Snake.GetTail()[1], COLLISION_COLOR);
+        }
     };
     let MoveTimer = new TTimer(MoveSnake);
     MoveTimer.Start(GAME_SPEED);
