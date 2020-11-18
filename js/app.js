@@ -198,8 +198,8 @@ class TTimer {
     }
 }
 function RunGame() {
-    const GAME_SPEED = 400;
-    const BEGIN_POINT = { x: 20, y: 40 };
+    const GAME_SPEED = 200;
+    const BEGIN_POINT = { x: 10, y: 20 };
     const SNAKE_LENGTH = 5;
     var el = document.getElementById("content");
     el.innerHTML = "Gamer: Tom, age: 29";
